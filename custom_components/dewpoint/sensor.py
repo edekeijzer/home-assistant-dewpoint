@@ -160,14 +160,38 @@ class DewPointSensor(Entity):
 
         return hum/100
 
+    @callback
+    def get_air_pres(self, entity):
+        state = self.hass.states.get(entity)
+
+        if state is None or state.state is None or state.state == 'unknown':
+            _LOGGER.error('Unable to read air pressure from unavailable sensor: %s', state.entity_id)
+            return
+
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        pres = util.convert(state.state, float)
+
+        if pres is None:
+            _LOGGER.error("Unable to read air pressure from sensor %s, state: %s",
+                          state.entity_id, state.state)
+            return None
+
+        # Convert to Pascals, which is what psychrolib uses
+        return util.pressure.convert(pres, unit, PRESSURE_PA)
+
     async def async_update(self):
         """Fetch new state data for the sensor."""
 
         dry_temp = self.get_dry_temp(self._entity_dry_temp)
         rel_hum = self.get_rel_hum(self._entity_rel_hum)
+        air_pres = self.get_air_pres(self._entity_air_pres)
         
         if dry_temp is not None and rel_hum is not None:
             import psychrolib
             psychrolib.SetUnitSystem(psychrolib.SI)
-            TDewPoint = psychrolib.GetTDewPointFromRelHum(dry_temp, rel_hum)
+            if dry_temp is None:
+                TDewPoint = psychrolib.GetTDewPointFromRelHum(dry_temp, rel_hum)
+            else:
+                wet_temp = psychrolib.GetTWetBulbFromRelHum(dry_temp, rel_hum, air_pres)
+                TDewPoint = psychrolib.GetTDewPointFromTWetBulb(dry_temp, wet_temp, air_pres)
             self._state = round(TDewPoint, 1)
