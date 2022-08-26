@@ -189,7 +189,7 @@ class DewPointSensor(Entity):
         if dry_temp is not None and rel_hum is not None:
             import psychrolib
             psychrolib.SetUnitSystem(psychrolib.SI)
-            if dry_temp is None:
+            if air_pres is None:
                 TDewPoint = psychrolib.GetTDewPointFromRelHum(dry_temp, rel_hum)
             else:
                 wet_temp = psychrolib.GetTWetBulbFromRelHum(dry_temp, rel_hum, air_pres)
